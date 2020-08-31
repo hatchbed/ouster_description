@@ -1,20 +1,26 @@
-[![Docker Stars](https://img.shields.io/docker/stars/wilselby/ouster_example.svg)](https://hub.docker.com/r/wilselby/ouster_example/)
-[![Docker Pulls](https://img.shields.io/docker/pulls/wilselby/ouster_example.svg)](https://hub.docker.com/r/wilselby/ouster_example/)
-[![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/wilselby/ouster_example/blob/master/LICENSE)
-[![Build Status](https://travis-ci.org/wilselby/ouster_example.svg?branch=master)](https://travis-ci.org/wilselby/ouster_example)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fwilselby%2Fouster_example.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fwilselby%2Fouster_example?ref=badge_shield)
+ouster_description
+===================
 
-# OS-1 Example Code
-Sample code for connecting to and configuring the OS-1, reading and visualizing
-data, and interfacing with ROS.
+This package is forked from https://github.com/wilselby/ouster_example, which is itself a fork of
+https://github.com/ouster-lidar/ouster_example
 
-See the `README.md` in each subdirectory for details.
+In order to reduce reliance on third-party components in deployed robots, I've stripped out everything from
+Wil Selby's fork except the Gazebo plugins and description package.  This should allow adding the OS-1 lidar
+to be added to Clearpath robots, while still using the manufacturer's ROS driver in an unmodified state.
 
-## Contents
-* [ouster_client/](ouster_client/README.md) contains an example C++ client for the OS-1 sensor
-* [ouster_viz/](ouster_viz/README.md) contains a visualizer for the OS-1 sensor
-* [ouster_ros/](ouster_ros/README.md) contains example ROS nodes for publishing point cloud messages
+Example use
+------------
 
-## Sample Data
-* Sample sensor output usable with the provided ROS code is available
-  [here](https://data.ouster.io/sample-data-1.10)
+To add the lidar to a robot, the easiest way is to clone both this repo and https://github.com/ouster-lidar/ouster_example
+into your workspace and build as normal.
+
+Then create an accessories URDF file and point e.g. JACKAL_URDF_EXTRAS to point to it.  For example, this will
+add the lidar to a Jackal's front mount:
+
+    <?xml version="1.0"?>
+    <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+      <xacro:include filename="$(find ouster_description)/urdf/OS1-64.urdf.xacro" />
+      <xacro:OS1-64 parent="front_mount">
+        <origin xyz="0 0 0" rpy="0 0 0" />
+      </xacro:OS1-64>
+    </robot>
