@@ -1,0 +1,23 @@
+- gz_topic_name: "/ouster/points/points"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  ros_topic_name: "/ouster/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  direction: GZ_TO_ROS
+
+- gz_topic_name: "/ouster/points"
+  gz_type_name: "gz.msgs.LaserScan"
+  ros_topic_name: "/ouster/scan"
+  ros_type_name: "sensor_msgs/msg/LaserScan"
+  direction: GZ_TO_ROS
+
+- gz_topic_name: "/ouster/imu"
+  gz_type_name: "gz.msgs.IMU"
+  ros_topic_name: "/ouster/imu"
+  ros_type_name: "sensor_msgs/msg/Imu"
+  direction: GZ_TO_ROS
+
+- gz_topic_name: "/clock"
+  gz_type_name: "gz.msgs.Clock"
+  ros_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  direction: GZ_TO_ROS

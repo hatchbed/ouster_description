@@ -1,9 +1,5 @@
-/CMakeLists.txt
-.catkin_tools/
-build/
-devel/
-logs/
-install/
+# Ignore Python compiled bytecode
+__pycache__/
+*.py[cod]
+
 *.bag
-doc/
-data/
