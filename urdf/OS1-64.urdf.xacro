@@ -1,7 +1,20 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="OS1-64">
   <xacro:property name="M_PI" value="3.1415926535897931" />
-  <xacro:macro name="OS1-64" params="*origin parent:=base_link name:=os_sensor topic_points:=/ouster/points topic_imu:=/ouster/imu hz:=10 lasers:=64 samples:=512 min_range:=0.9 max_range:=75.0 noise:=0.008 min_angle:=-${M_PI} max_angle:=${M_PI} lidar_link:=os_lidar imu_link:=os_imu vfov_min:=-.26 vfov_max:=.26">
+  <!--
+    IMU yaw rate (gyro Z) noise parameters — Ouster OS1 uses InvenSense ICM-20948:
+      imu_yaw_noise_stddev            — white noise std dev (rad/s)
+                                        ICM-20948 ARW: 0.015 °/s/√Hz = 2.62e-4 rad/s/√Hz
+                                        at 100 Hz → 2.62e-3 rad/s; default 0.005 is conservative.
+                                        Ref: InvenSense ICM-20948 datasheet DS-000189 v1.3, Table 3.
+      imu_yaw_bias_stddev             — Gauss-Markov dynamic bias std dev (rad/s).
+                                        Steady-state std equals this value.
+                                        ICM-20948 in-run bias instability ≈ 10 °/hr = 4.85e-5 rad/s
+                                        (typical consumer MEMS; not explicitly listed in ICM-20948 datasheet).
+      imu_yaw_bias_correlation_time   — Gauss-Markov time constant (s).
+                                        1000 s is conventional for MEMS gyroscopes.
+  -->
+  <xacro:macro name="OS1-64" params="*origin parent:=base_link name:=os_sensor topic_points:=/ouster/points topic_imu:=/ouster/imu hz:=10 lasers:=64 samples:=512 min_range:=0.9 max_range:=75.0 noise:=0.008 min_angle:=-${M_PI} max_angle:=${M_PI} lidar_link:=os_lidar imu_link:=os_imu vfov_min:=-.26 vfov_max:=.26 imu_yaw_noise_stddev:=0.005 imu_yaw_bias_stddev:=0.0000485 imu_yaw_bias_correlation_time:=1000.0">
 
     <!-- Links and Joints -->
     <joint name="${name}_mount_joint" type="fixed">
@@ -116,7 +129,14 @@
           <angular_velocity>
             <x><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></x>
             <y><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></y>
-            <z><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></z>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>${imu_yaw_noise_stddev}</stddev>
+                <dynamic_bias_stddev>${imu_yaw_bias_stddev}</dynamic_bias_stddev>
+                <dynamic_bias_correlation_time>${imu_yaw_bias_correlation_time}</dynamic_bias_correlation_time>
+              </noise>
+            </z>
           </angular_velocity>
           <linear_acceleration>
             <x><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></x>
