@@ -1,35 +1,72 @@
+# Copyright (c) 2018, ouster-lidar
+# Copyright (c) 2019, Wil Selby
+# Copyright (c) 2020, Clearpath Robotics
+# Copyright (c) 2024, Marc Alban / Hatchbed LLC
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the copyright holder nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
 import os
 import subprocess
 
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription, EmitEvent, 
-                            ExecuteProcess, OpaqueFunction, RegisterEventHandler, SetEnvironmentVariable)
+from launch.actions import (
+    DeclareLaunchArgument, EmitEvent, IncludeLaunchDescription,
+    OpaqueFunction, RegisterEventHandler, SetEnvironmentVariable,
+)
 from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessExit, OnProcessStart, OnShutdown
 from launch.events import Shutdown
 from launch.events.process import ProcessStarted
-from launch.event_handlers import OnProcessExit, OnProcessStart, OnShutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
-from launch.substitutions import LaunchConfiguration, Command, PathJoinSubstitution, PythonExpression
+from launch.substitutions import (
+    Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression,
+)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+
 
 launch_logger = get_logger('gazebo_cleanup')
 
 # Create a global list to store the exact PIDs assigned by the OS
 gz_pids = []
 
+
 def record_pids(event: ProcessStarted, context):
-    """Captures the OS PID of the Gazebo wrapper the moment it starts."""
+    """Capture the OS PID of the Gazebo wrapper the moment it starts."""
     global gz_pids
     # The launch system names the process 'gazebo-1', 'ruby', or 'gz'
     if 'gazebo' in event.process_name or 'gz' in event.process_name:
         gz_pids.append(event.pid)
-        launch_logger.info(f"Recorded gazebo PID: {event.pid}")
+        launch_logger.info(f'Recorded gazebo PID: {event.pid}')
+
 
 def get_descendant_pids(pid):
-    """Recursively finds all descendant PIDs of a given parent PID."""
-    pids =[]
+    """Recursively find all descendant PIDs of a given parent PID."""
+    pids = []
     try:
         # pgrep -P returns the direct children of the given PID
         output = subprocess.check_output(['pgrep', '-P', str(pid)])
@@ -38,19 +75,20 @@ def get_descendant_pids(pid):
             # Recursively find children of this child (grandchildren, etc.)
             pids.extend(get_descendant_pids(child_pid))
     except subprocess.CalledProcessError:
-        pass # pgrep returns an error code if no children are found
+        pass  # pgrep returns an error code if no children are found
     return pids
 
+
 def kill_gazebo_tree(context, *args, **kwargs):
-    """Surgically kills the recorded PIDs and their children on shutdown."""
+    """Surgically kill the recorded PIDs and their children on shutdown."""
     global gz_pids
     if len(gz_pids) == 0:
         return
 
-    launch_logger.info("Cleaning up gazebo ...")
+    launch_logger.info('Cleaning up gazebo ...')
     for pid in gz_pids:
         descendants = get_descendant_pids(pid)
-        
+
         if descendants:
             launch_logger.info(f'Terminating descendants of gazebo [{pid}] ...')
             # Reverse the list to kill grandchildren first (bottom-up execution)
@@ -58,8 +96,9 @@ def kill_gazebo_tree(context, *args, **kwargs):
                 # Use SIGKILL (-9) on descendants to guarantee the server dies instantly
                 launch_logger.info(f'Killing gazebo descendant [{child_pid}] ...')
                 subprocess.run(['kill', '-9', str(child_pid)], stderr=subprocess.DEVNULL)
-        
+
     gz_pids = []
+
 
 def generate_launch_description():
     # Package Directories
@@ -76,7 +115,11 @@ def generate_launch_description():
     # Create a SetEnvironmentVariable action
     set_gz_resource_path = SetEnvironmentVariable(
         name='GZ_SIM_RESOURCE_PATH',
-        value=[os.environ.get('GZ_SIM_RESOURCE_PATH', ''), ':', PathJoinSubstitution([pkg_ouster_description, '..'])]
+        value=[
+            os.environ.get('GZ_SIM_RESOURCE_PATH', ''),
+            ':',
+            PathJoinSubstitution([pkg_ouster_description, '..']),
+        ]
     )
 
     # 1. Declare Launch Arguments
@@ -87,11 +130,12 @@ def generate_launch_description():
     )
     declare_model_arg = DeclareLaunchArgument(
         'model',
-        default_value=PathJoinSubstitution([pkg_ouster_description, 'urdf', 'example.urdf.xacro'])
+        default_value=PathJoinSubstitution(
+            [pkg_ouster_description, 'urdf', 'example.urdf.xacro']
+        )
     )
     declare_rviz_arg = DeclareLaunchArgument('rviz', default_value='true')
     declare_gui_arg = DeclareLaunchArgument('gui', default_value='true')
-
 
     # 2. Start Gazebo Sim
     gazebo_launch = IncludeLaunchDescription(
@@ -100,8 +144,8 @@ def generate_launch_description():
         ),
         launch_arguments={
             'gz_args': [
-                world_name, 
-                ' -r', 
+                world_name,
+                ' -r',
                 PythonExpression(["' -s' if '", gui, "' == 'false' else ''"])],
         }.items()
     )
@@ -135,7 +179,6 @@ def generate_launch_description():
     # 6. Bridge LiDAR and IMU topics from Gazebo to ROS 2
     # Note: These topics must match the <topic> tags in your xacro
     bridge_config = PathJoinSubstitution([pkg_ouster_description, 'config', 'bridge.yaml'])
-    # Then update the node
     bridge_node = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
@@ -194,4 +237,3 @@ def generate_launch_description():
     ])
 
     return ld
-

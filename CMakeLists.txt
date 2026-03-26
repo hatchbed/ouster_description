@@ -3,13 +3,18 @@ project(ouster_description)
 
 find_package(ament_cmake REQUIRED)
 
-install(DIRECTORY 
+install(DIRECTORY
   config
-  launch 
-  meshes 
-  rviz 
-  urdf 
+  launch
+  meshes
+  rviz
+  urdf
   worlds
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(FILES
+  CONTRIBUTING.md
   DESTINATION share/${PROJECT_NAME}
 )
 
