@@ -80,11 +80,15 @@ class MessageCollector:
 
     def __init__(self, node, topic_name, msg_type, qos=10):
         self.msgs = []
+        self.stamps = []
         self.sub = node.create_subscription(
             msg_type, topic_name, self.callback, qos)
 
     def callback(self, msg):
         self.msgs.append(time.time())
+        if hasattr(msg, 'header'):
+            stamp = msg.header.stamp
+            self.stamps.append(stamp.sec + stamp.nanosec * 1e-9)
 
 
 # ---------------------------------------------------------
@@ -149,7 +153,9 @@ class TestOusterGazebo(unittest.TestCase):
         # Measure Hz for 10.0 seconds (hztest Phase)
         # ---------------------------------------------------------
         points_col.msgs.clear()
+        points_col.stamps.clear()
         imu_col.msgs.clear()
+        imu_col.stamps.clear()
 
         hz_test_duration = 10.0
         start_hz_time = time.time()
@@ -157,8 +163,16 @@ class TestOusterGazebo(unittest.TestCase):
         while time.time() - start_hz_time < hz_test_duration:
             rclpy.spin_once(self.node, timeout_sec=0.1)
 
-        points_hz = len(points_col.msgs) / hz_test_duration
-        imu_hz = len(imu_col.msgs) / hz_test_duration
+        def compute_hz(collector):
+            stamps = collector.stamps
+            if len(stamps) >= 2:
+                duration = max(stamps) - min(stamps)
+                if duration > 0:
+                    return (len(stamps) - 1) / duration
+            return len(collector.msgs) / hz_test_duration
+
+        points_hz = compute_hz(points_col)
+        imu_hz = compute_hz(imu_col)
 
         self.assertGreaterEqual(points_hz, 1.0, f'/ouster/points Hz too low: {points_hz}')
         self.assertLessEqual(points_hz, 25.0, f'/ouster/points Hz too high: {points_hz}')

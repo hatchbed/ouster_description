@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="osdome_base">
+  <xacro:property name="M_PI" value="3.1415926535897931" />
+  <!--
+    OSDome shared sensor macro — common geometry, physics, and Gazebo sensor configuration
+    for Ouster OSDome-32, OSDome-64, and OSDome-128 LiDAR sensors.
+    Source: Ouster OSDome datasheet REV7 / FW3.1
+
+    Physical dimensions (identical across all channel-count variants):
+      Sensor body : r=43.5 mm, h=85.27 mm cylinder (diameter 87 mm)
+      Mounting base: 110×110×22.5 mm rectangular box (optional, shared with OS0)
+
+    The dome faces upward — lidar_link is placed at the top of the dome body
+    where the beams originate.
+
+    Mesh origins (all at bottom of part, Z-up):
+      osdome_sensor: r=43.5 mm, h=85.27 mm — sensor body
+      os0_base     : 110×110×22.5 mm box   — rectangular mounting base (shared with OS0)
+
+    Parameters:
+      sensor_model — sensor variant string, e.g. "OSDome-32", "OSDome-64", "OSDome-128".
+                     The number of vertical scan lines (lasers) is extracted automatically.
+  -->
+
+  <xacro:macro name="osdome_sensor" params="*origin sensor_model parent:=base_link name:=os_sensor
+      topic_points:=/ouster/points topic_imu:=/ouster/imu hz:=10 samples:=1024
+      min_range:=0.3 max_range:=45.0 noise:=0.01
+      min_angle:=-${M_PI} max_angle:=${M_PI}
+      lidar_link:=os_lidar imu_link:=os_imu
+      vfov_min:=-${M_PI/2} vfov_max:=${M_PI/2}
+      imu_yaw_noise_stddev:=0.005 imu_yaw_bias_stddev:=0.0000242
+      imu_yaw_bias_correlation_time:=1000.0
+      base:=true">
+
+    <!-- Vertical scan lines extracted from sensor_model string, e.g. "OSDome-64" → 64 -->
+    <xacro:property name="lasers" value="${int(sensor_model.split('-')[-1])}"/>
+    <xacro:property name="base_z" value="${0.0225 if str(base).lower() == 'true' else 0.0}"/>
+
+    <!-- Links and Joints -->
+    <joint name="${name}_mount_joint" type="fixed">
+      <xacro:insert_block name="origin" />
+      <parent link="${parent}"/>
+      <child link="${name}_base_link"/>
+    </joint>
+
+    <link name="${name}_base_link" />
+
+    <joint name="${name}_body_joint" type="fixed">
+      <parent link="${name}_base_link"/>
+      <child link="${name}"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}">
+      <inertial>
+        <mass value="0.47"/>
+        <origin xyz="0 0 ${base_z + 0.0426}" rpy="0 0 0" />
+        <inertia ixx="0.000360" ixy="0" ixz="0" iyy="0.000360" iyz="0" izz="0.000264"/>
+      </inertial>
+
+      <!-- Mounting base (optional) — shared with OS0, 110×110×22.5 mm -->
+      <xacro:if value="${str(base).lower() == 'true'}">
+        <visual name="base_visual">
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://ouster_description/meshes/os0_base.glb"/>
+          </geometry>
+        </visual>
+        <collision name="base_collision">
+          <origin xyz="0 0 0.01125" rpy="0 0 0"/>
+          <geometry><box size="0.110 0.110 0.0225"/></geometry>
+        </collision>
+      </xacro:if>
+
+      <!-- Sensor body — cylinder r=43.5 mm, h=85.27 mm, origin at bottom -->
+      <visual name="sensor_visual">
+        <origin xyz="0 0 ${base_z}" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://ouster_description/meshes/osdome_sensor.glb"/>
+        </geometry>
+      </visual>
+      <collision name="sensor_collision">
+        <origin xyz="0 0 ${base_z + 0.042633}" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0435" length="0.08527"/></geometry>
+      </collision>
+    </link>
+
+    <link name="${imu_link}" />
+    <link name="${lidar_link}" />
+
+    <joint name="${name}_imu_link_joint" type="fixed">
+      <parent link="${name}" />
+      <child link="${imu_link}" />
+      <origin xyz="0.006253 -0.011775 ${base_z + 0.007645}" rpy="0 0 0" />
+    </joint>
+
+    <!-- lidar_link at top of dome body where beams originate -->
+    <joint name="${name}_lidar_link_joint" type="fixed">
+      <parent link="${name}" />
+      <child link="${lidar_link}" />
+      <origin xyz="0.0 0.0 ${base_z + 0.08527}" rpy="0 0 0" />
+    </joint>
+
+    <!-- GAZEBO SENSORS -->
+
+    <!-- GPU Lidar Sensor -->
+    <gazebo reference="${lidar_link}">
+      <sensor name="${name}-${sensor_model}" type="gpu_lidar">
+        <gz_frame_id>${lidar_link}</gz_frame_id>
+        <pose>0 0 0 0 0 0</pose>
+        <topic>${topic_points}</topic>
+        <update_rate>${hz}</update_rate>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>${samples}</samples>
+              <resolution>1</resolution>
+              <min_angle>${min_angle}</min_angle>
+              <max_angle>${max_angle}</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>${lasers}</samples>
+              <resolution>1</resolution>
+              <min_angle>${vfov_min}</min_angle>
+              <max_angle>${vfov_max}</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>${min_range}</min>
+            <max>${max_range}</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>${noise}</stddev>
+          </noise>
+        </lidar>
+        <always_on>1</always_on>
+        <visualize>false</visualize>
+      </sensor>
+    </gazebo>
+
+    <!-- IMU Sensor -->
+    <gazebo reference="${imu_link}">
+      <sensor name="${name}_imu" type="imu">
+        <gz_frame_id>${imu_link}</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>100</update_rate>
+        <topic>${topic_imu}</topic>
+        <imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></y>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>${imu_yaw_noise_stddev}</stddev>
+                <dynamic_bias_stddev>${imu_yaw_bias_stddev}</dynamic_bias_stddev>
+                <dynamic_bias_correlation_time>${imu_yaw_bias_correlation_time}</dynamic_bias_correlation_time>
+              </noise>
+            </z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </gazebo>
+
+  </xacro:macro>
+</robot>

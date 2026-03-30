@@ -46,6 +46,7 @@ from launch.substitutions import (
     Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression,
 )
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -151,7 +152,7 @@ def generate_launch_description():
     )
 
     # 3. Process Xacro file
-    robot_description_content = Command(['xacro ', model])
+    robot_description_content = ParameterValue(Command(['xacro ', model]), value_type=str)
 
     # 4. Robot State Publisher
     robot_state_publisher_node = Node(

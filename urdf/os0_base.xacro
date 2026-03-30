@@ -1,0 +1,207 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="os0_base">
+  <xacro:property name="M_PI" value="3.1415926535897931" />
+  <!--
+    OS0 shared sensor macro — common geometry, physics, and Gazebo sensor configuration
+    for Ouster OS0-32, OS0-64, and OS0-128 LiDAR sensors.
+    Source: Ouster OS0 datasheet REV7 / FW3.1
+
+    Physical dimensions (identical across all channel-count variants):
+      Sensor body : r=43.5 mm, h=58.35 mm cylinder
+      Mounting base: 110×110×22.5 mm rectangular box (optional)
+      Fin cap     : r=40.2 mm, h=21.4 mm cylinder (optional)
+      Halo cap    : r=43.4 mm, h=21.4 mm cylinder (optional)
+
+    Mass and inertia are constant across the 32/64/128-channel variants because the
+    physical sensor body is identical — only the number of scan lines differs.
+    Values approximate the default assembly (sensor body + base + halo cap, 0.43 kg).
+    Source: Ouster OS0 datasheet REV7.
+
+    Mesh origins (all at bottom of part, Z-up):
+      os0_sensor  : r=43.5 mm, h=58.35 mm — sensor body cylinder
+      os0_base    : 110×110×22.5 mm box   — rectangular mounting base
+      os0_fin_cap : r=40.2 mm, h=21.4 mm  — sits at z=52.1–73.5 mm in sensor frame
+      os0_halo_cap: r=43.4 mm, h=21.4 mm  — sits at z=52.1–73.5 mm in sensor frame
+
+    Parameters:
+      sensor_model — sensor variant string, e.g. "OS0-32", "OS0-64", "OS0-128".
+                     The number of vertical scan lines (lasers) is extracted automatically.
+  -->
+
+  <xacro:macro name="os0_sensor" params="*origin sensor_model parent:=base_link name:=os_sensor
+      topic_points:=/ouster/points topic_imu:=/ouster/imu hz:=10 samples:=1024
+      min_range:=0.3 max_range:=75.0 noise:=0.008
+      min_angle:=-${M_PI} max_angle:=${M_PI}
+      lidar_link:=os_lidar imu_link:=os_imu
+      vfov_min:=-0.79234 vfov_max:=0.79234
+      imu_yaw_noise_stddev:=0.005 imu_yaw_bias_stddev:=0.0000242
+      imu_yaw_bias_correlation_time:=1000.0
+      base:=true cap:=halo">
+
+    <!-- Vertical scan lines extracted from sensor_model string, e.g. "OS0-128" → 128 -->
+    <xacro:property name="lasers" value="${int(sensor_model.split('-')[-1])}"/>
+    <xacro:property name="base_z" value="${0.0225 if str(base).lower() == 'true' else 0.0}"/>
+
+    <!-- Links and Joints -->
+    <joint name="${name}_mount_joint" type="fixed">
+      <xacro:insert_block name="origin" />
+      <parent link="${parent}"/>
+      <child link="${name}_base_link"/>
+    </joint>
+
+    <link name="${name}_base_link" />
+
+    <joint name="${name}_body_joint" type="fixed">
+      <parent link="${name}_base_link"/>
+      <child link="${name}"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}">
+      <inertial>
+        <mass value="0.43"/>
+        <origin xyz="0 0 ${base_z + 0.0365}" rpy="0 0 0" />
+        <inertia ixx="0.000310" ixy="0" ixz="0" iyy="0.000310" iyz="0" izz="0.000340"/>
+      </inertial>
+
+      <!-- Mounting base (optional) — rectangular box, 110×110×22.5 mm -->
+      <xacro:if value="${str(base).lower() == 'true'}">
+        <visual name="base_visual">
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://ouster_description/meshes/os0_base.glb"/>
+          </geometry>
+        </visual>
+        <collision name="base_collision">
+          <origin xyz="0 0 0.01125" rpy="0 0 0"/>
+          <geometry><box size="0.110 0.110 0.0225"/></geometry>
+        </collision>
+      </xacro:if>
+
+      <!-- Sensor body — cylinder r=43.5 mm, h=58.35 mm, origin at bottom -->
+      <visual name="sensor_visual">
+        <origin xyz="0 0 ${base_z}" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://ouster_description/meshes/os0_sensor.glb"/>
+        </geometry>
+      </visual>
+      <collision name="sensor_collision">
+        <origin xyz="0 0 ${base_z + 0.02918}" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0435" length="0.05835"/></geometry>
+      </collision>
+
+      <!-- Fin cap (optional) — cylinder r=40.2 mm, h=21.4 mm -->
+      <xacro:if value="${cap == 'fin'}">
+        <visual name="cap_visual">
+          <origin xyz="0 0 ${base_z}" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://ouster_description/meshes/os0_fin_cap.glb"/>
+          </geometry>
+        </visual>
+        <collision name="cap_collision">
+          <origin xyz="0 0 ${base_z + 0.06281}" rpy="0 0 0"/>
+          <geometry><cylinder radius="0.0402" length="0.02139"/></geometry>
+        </collision>
+      </xacro:if>
+
+      <!-- Halo cap (optional) — cylinder r=43.4 mm, h=21.4 mm -->
+      <xacro:if value="${cap == 'halo'}">
+        <visual name="cap_visual">
+          <origin xyz="0 0 ${base_z}" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="package://ouster_description/meshes/os0_halo_cap.glb"/>
+          </geometry>
+        </visual>
+        <collision name="cap_collision">
+          <origin xyz="0 0 ${base_z + 0.06281}" rpy="0 0 0"/>
+          <geometry><cylinder radius="0.0434" length="0.02139"/></geometry>
+        </collision>
+      </xacro:if>
+    </link>
+
+    <link name="${imu_link}" />
+    <link name="${lidar_link}" />
+
+    <joint name="${name}_imu_link_joint" type="fixed">
+      <parent link="${name}" />
+      <child link="${imu_link}" />
+      <origin xyz="0.006253 -0.011775 ${base_z + 0.007645}" rpy="0 0 0" />
+    </joint>
+
+    <joint name="${name}_lidar_link_joint" type="fixed">
+      <parent link="${name}" />
+      <child link="${lidar_link}" />
+      <origin xyz="0.0 0.0 ${base_z + 0.03618}" rpy="0 0 0" />
+    </joint>
+
+    <!-- GAZEBO SENSORS -->
+
+    <!-- GPU Lidar Sensor -->
+    <gazebo reference="${lidar_link}">
+      <sensor name="${name}-${sensor_model}" type="gpu_lidar">
+        <gz_frame_id>${lidar_link}</gz_frame_id>
+        <pose>0 0 0 0 0 0</pose>
+        <topic>${topic_points}</topic>
+        <update_rate>${hz}</update_rate>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>${samples}</samples>
+              <resolution>1</resolution>
+              <min_angle>${min_angle}</min_angle>
+              <max_angle>${max_angle}</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>${lasers}</samples>
+              <resolution>1</resolution>
+              <min_angle>${vfov_min}</min_angle>
+              <max_angle>${vfov_max}</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>${min_range}</min>
+            <max>${max_range}</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>${noise}</stddev>
+          </noise>
+        </lidar>
+        <always_on>1</always_on>
+        <visualize>false</visualize>
+      </sensor>
+    </gazebo>
+
+    <!-- IMU Sensor -->
+    <gazebo reference="${imu_link}">
+      <sensor name="${name}_imu" type="imu">
+        <gz_frame_id>${imu_link}</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>100</update_rate>
+        <topic>${topic_imu}</topic>
+        <imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></y>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>${imu_yaw_noise_stddev}</stddev>
+                <dynamic_bias_stddev>${imu_yaw_bias_stddev}</dynamic_bias_stddev>
+                <dynamic_bias_correlation_time>${imu_yaw_bias_correlation_time}</dynamic_bias_correlation_time>
+              </noise>
+            </z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </gazebo>
+
+  </xacro:macro>
+</robot>

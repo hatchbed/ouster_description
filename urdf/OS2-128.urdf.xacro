@@ -25,146 +25,29 @@
       imu_yaw_bias_correlation_time — Gauss-Markov time constant (s).
                                       1000 s is conventional for MEMS gyroscopes.
   -->
+  <xacro:include filename="$(find ouster_description)/urdf/os2_base.xacro"/>
+
   <xacro:macro name="OS2-128" params="*origin parent:=base_link name:=os_sensor
-      topic_points:=/ouster/points topic_imu:=/ouster/imu hz:=10 lasers:=128 samples:=1024
+      topic_points:=/ouster/points topic_imu:=/ouster/imu hz:=10 samples:=1024
       min_range:=0.8 max_range:=200.0 noise:=0.02
       min_angle:=-${M_PI} max_angle:=${M_PI}
       lidar_link:=os_lidar imu_link:=os_imu
       vfov_min:=-0.19635 vfov_max:=0.19635
       imu_yaw_noise_stddev:=0.005 imu_yaw_bias_stddev:=0.0000485
-      imu_yaw_bias_correlation_time:=1000.0">
-
-    <!-- Links and Joints -->
-    <joint name="${name}_mount_joint" type="fixed">
-      <xacro:insert_block name="origin" />
-      <parent link="${parent}"/>
-      <child link="${name}_base_link"/>
-    </joint>
-
-    <link name="${name}_base_link" />
-
-    <joint name="${name}_base_to_baseplate" type="fixed">
-      <parent link="${name}_base_link"/>
-      <child link="${name}_baseplate" />
-      <origin xyz="0 0 0.008"/>
-    </joint>
-
-    <link name="${name}_baseplate">
-      <visual>
-        <geometry><box size="0.140 0.140 0.016" /></geometry>
-        <material name="silver"><color rgba="0.5 0.5 0.5 1.0" /></material>
-      </visual>
-      <collision>
-        <geometry><box size="0.140 0.140 0.016" /></geometry>
-      </collision>
-    </link>
-
-    <joint name="${name}_baseplate_to_body" type="fixed">
-      <parent link="${name}_baseplate"/>
-      <child link="${name}"/>
-      <origin xyz="0 0 0.052" rpy="0 0 0" />
-    </joint>
-
-    <!-- OS2 body: diameter 119.6 mm, height 102.9 mm, weight 1100 g -->
-    <link name="${name}">
-      <inertial>
-        <mass value="1.1"/>
-        <origin xyz="0 0 0.0515" rpy="0 0 0" />
-        <inertia ixx="0.002400" ixy="0" ixz="0" iyy="0.002400" iyz="0" izz="0.003940"/>
-      </inertial>
-      <collision name="base_collision">
-        <origin xyz="0 0 0.0515" rpy="0 0 0" />
-        <geometry><cylinder radius="0.06" length="0.103"/></geometry>
-      </collision>
-      <visual name="base_visual">
-        <origin xyz="0 0 0.0515" rpy="0 0 0" />
-        <geometry><cylinder radius="0.06" length="0.103"/></geometry>
-      </visual>
-    </link>
-
-    <link name="${imu_link}" />
-    <link name="${lidar_link}" />
-
-    <joint name="${name}_imu_link_joint" type="fixed">
-      <parent link="${name}" />
-      <child link="${imu_link}" />
-      <origin xyz="0.006253 -0.011775 0.007645" rpy="0 0 0" />
-    </joint>
-
-    <joint name="${name}_lidar_link_joint" type="fixed">
-      <parent link="${name}" />
-      <child link="${lidar_link}" />
-      <origin xyz="0.0 0.0 0.0515" rpy="0 0 0" />
-    </joint>
-
-    <!-- GAZEBO SENSORS -->
-
-    <!-- GPU Lidar Sensor -->
-    <gazebo reference="${lidar_link}">
-      <sensor name="${name}-OS2-128" type="gpu_lidar">
-        <gz_frame_id>${lidar_link}</gz_frame_id>
-        <pose>0 0 0 0 0 0</pose>
-        <topic>${topic_points}</topic>
-        <update_rate>${hz}</update_rate>
-        <lidar>
-          <scan>
-            <horizontal>
-              <samples>${samples}</samples>
-              <resolution>1</resolution>
-              <min_angle>${min_angle}</min_angle>
-              <max_angle>${max_angle}</max_angle>
-            </horizontal>
-            <vertical>
-              <samples>${lasers}</samples>
-              <resolution>1</resolution>
-              <min_angle>${vfov_min}</min_angle>
-              <max_angle>${vfov_max}</max_angle>
-            </vertical>
-          </scan>
-          <range>
-            <min>${min_range}</min>
-            <max>${max_range}</max>
-            <resolution>0.01</resolution>
-          </range>
-          <noise>
-            <type>gaussian</type>
-            <mean>0.0</mean>
-            <stddev>${noise}</stddev>
-          </noise>
-        </lidar>
-        <always_on>1</always_on>
-        <visualize>false</visualize>
-      </sensor>
-    </gazebo>
-
-    <!-- IMU Sensor -->
-    <gazebo reference="${imu_link}">
-      <sensor name="${name}_imu" type="imu">
-        <gz_frame_id>${imu_link}</gz_frame_id>
-        <always_on>1</always_on>
-        <update_rate>100</update_rate>
-        <topic>${topic_imu}</topic>
-        <imu>
-          <angular_velocity>
-            <x><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></x>
-            <y><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></y>
-            <z>
-              <noise type="gaussian">
-                <mean>0.0</mean>
-                <stddev>${imu_yaw_noise_stddev}</stddev>
-                <dynamic_bias_stddev>${imu_yaw_bias_stddev}</dynamic_bias_stddev>
-                <dynamic_bias_correlation_time>${imu_yaw_bias_correlation_time}</dynamic_bias_correlation_time>
-              </noise>
-            </z>
-          </angular_velocity>
-          <linear_acceleration>
-            <x><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></x>
-            <y><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></y>
-            <z><noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise></z>
-          </linear_acceleration>
-        </imu>
-      </sensor>
-    </gazebo>
-
+      imu_yaw_bias_correlation_time:=1000.0
+      base:=true">
+    <xacro:os2_sensor sensor_model="OS2-128" parent="${parent}" name="${name}"
+        topic_points="${topic_points}" topic_imu="${topic_imu}"
+        hz="${hz}" samples="${samples}"
+        min_range="${min_range}" max_range="${max_range}" noise="${noise}"
+        min_angle="${min_angle}" max_angle="${max_angle}"
+        lidar_link="${lidar_link}" imu_link="${imu_link}"
+        vfov_min="${vfov_min}" vfov_max="${vfov_max}"
+        imu_yaw_noise_stddev="${imu_yaw_noise_stddev}"
+        imu_yaw_bias_stddev="${imu_yaw_bias_stddev}"
+        imu_yaw_bias_correlation_time="${imu_yaw_bias_correlation_time}"
+        base="${base}">
+      <xacro:insert_block name="origin"/>
+    </xacro:os2_sensor>
   </xacro:macro>
 </robot>
